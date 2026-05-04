@@ -22,6 +22,12 @@ const choiceTitle = document.getElementById("choiceTitle");
 const choiceText = document.getElementById("choiceText");
 const choiceActions = document.getElementById("choiceActions");
 const toast = document.getElementById("toast");
+const introPanel = document.getElementById("introPanel");
+const introKicker = document.getElementById("introKicker");
+const introTitle = document.getElementById("introTitle");
+const introText = document.getElementById("introText");
+const introNextButton = document.getElementById("introNextButton");
+const introSkipButton = document.getElementById("introSkipButton");
 
 const W = 960;
 const H = 540;
@@ -58,12 +64,17 @@ let toastTimer = 0;
 let unlockedAudio = false;
 let muted = false;
 let audioCtx = null;
+let musicGain = null;
+let musicTimer = null;
+let musicStep = 0;
+let musicMode = null;
 let totalRelics = 0;
 let totalShards = 0;
 let time = 0;
 let pendingChoice = null;
 let run = null;
 let save = null;
+let introIndex = 0;
 
 const SAVE_KEY = "oscarTheKnightSaveV1";
 
@@ -187,6 +198,7 @@ const ENV = {
 function setOverlayMode(mode) {
   document.body.classList.toggle("menu-open", mode === "menu");
   document.body.classList.toggle("cinema-open", mode === "cinema");
+  document.body.classList.toggle("intro-open", mode === "intro");
 }
 
 const KEYMAP = {
@@ -208,6 +220,7 @@ const KEYMAP = {
   Digit1: "choice1",
   Digit2: "choice2",
   Digit3: "choice3",
+  Digit4: "choice4",
   KeyP: "pause",
   Escape: "pause",
 };
@@ -260,6 +273,24 @@ const CUTSCENES = {
   ],
 };
 
+const INTRO_SCENES = [
+  {
+    kicker: "Prologue",
+    title: "The Crown Lantern Falls Silent",
+    text: "Rowanvale wakes under a moon that forgot to leave. Oscar hears the old bell fail, buckles on a borrowed shield, and follows the last warm spark toward the Thorn Regent.",
+  },
+  {
+    kicker: "The Oath",
+    title: "A Small Knight Steps Forward",
+    text: "The old captains argue about roads and omens. Oscar notices the gate is open, which seems like enough of a plan to begin with.",
+  },
+  {
+    kicker: "The Run",
+    title: "Thirty Rooms To Dawn",
+    text: "Gather moon shards, choose relics, spend Sun Sigils, and tune Oscar's equipment between attempts. Each run should leave him stranger, stronger, and closer to morning.",
+  },
+];
+
 const SKILLS = [
   { id: "blade", name: "Longer Blade", branch: "Sword", cost: 3, max: 3, desc: "+12% slash reach and damage per rank." },
   { id: "guard", name: "Lion Guard", branch: "Shield", cost: 3, max: 3, desc: "+1 max heart on ranks 1 and 3." },
@@ -284,6 +315,30 @@ const RELICS = [
   { id: "silverLedger", name: "Silver Ledger", desc: "Combat rooms bank one extra Sun Sigil.", color: "#e2e0d2" },
   { id: "duelistRibbon", name: "Duelist Ribbon", desc: "Every fifth defeated foe restores a heart.", color: "#d4586a" },
   { id: "glassBell", name: "Glass Bell", desc: "Taking damage drops a burst of moon shards.", color: "#a6e6d6" },
+];
+
+const EQUIPMENT = {
+  weapon: [
+    { id: "oathblade", name: "Oathblade", desc: "Balanced sword. Reliable reach and rhythm.", mods: {} },
+    { id: "sunlance", name: "Sunlance", desc: "Longer, heavier strikes. +25% damage, slower run speed.", mods: { damage: 0.25, speed: -0.18 } },
+    { id: "needle", name: "Briar Needle", desc: "Fast duelist blade. +speed, shorter reach, extra shards from kills.", mods: { speed: 0.28, reach: -8, killShard: 1 } },
+  ],
+  armor: [
+    { id: "travelcloak", name: "Travel Cloak", desc: "Light armor. Smooth jumps and normal hearts.", mods: {} },
+    { id: "lionplate", name: "Lion Plate", desc: "+1 heart, but Oscar runs a little slower.", mods: { hearts: 1, speed: -0.22 } },
+    { id: "moonweave", name: "Moonweave", desc: "No extra heart, but hazards hurt less often.", mods: { hazardGrace: 1 } },
+  ],
+  charm: [
+    { id: "plainbell", name: "Plain Bell", desc: "A steady charm with no tradeoff.", mods: {} },
+    { id: "merchantseal", name: "Merchant Seal", desc: "Begin with +6 shards and better shop prices.", mods: { startShards: 6, discount: 2 } },
+    { id: "crestfinder", name: "Crestfinder", desc: "Relic choices show one extra option.", mods: { relicChoice: 1 } },
+  ],
+};
+
+const EQUIPMENT_SLOTS = [
+  { id: "weapon", name: "Weapon" },
+  { id: "armor", name: "Armor" },
+  { id: "charm", name: "Charm" },
 ];
 
 const ROOM_KINDS = [
@@ -584,7 +639,7 @@ class Player {
 
   update(dt) {
     const accel = this.grounded ? 0.84 : 0.5;
-    const max = input.down ? 2.6 : 4.2 + skillLevel("blade") * 0.12 + (hasRelic("swiftGreaves") ? 0.45 : 0);
+    const max = input.down ? 2.6 : 4.2 + skillLevel("blade") * 0.12 + (hasRelic("swiftGreaves") ? 0.45 : 0) + equipmentMod("speed");
     if (input.left) this.vx -= accel;
     if (input.right) this.vx += accel;
     if (!input.left && !input.right) this.vx *= this.grounded ? 0.78 : hasRelic("swiftGreaves") ? 0.98 : 0.95;
@@ -689,7 +744,7 @@ class Player {
 
   attackBox() {
     if (this.attackTimer <= 4) return null;
-    const reach = 46 + skillLevel("blade") * 7;
+    const reach = 46 + skillLevel("blade") * 7 + equipmentMod("reach");
     return {
       x: this.dir > 0 ? this.x + this.w - 4 : this.x - reach + 4,
       y: this.y + 11,
@@ -708,6 +763,9 @@ class Player {
       return;
     }
     if (hasRelic("emberBoots") && activeLevel?.hazards?.some((h) => h.type === "lava" && rects(this.rect, h))) {
+      amount = Math.max(1, amount - 1);
+    }
+    if (equipmentMod("hazardGrace") && activeLevel?.hazards?.some((h) => rects(this.rect, h))) {
       amount = Math.max(1, amount - 1);
     }
     this.hp -= amount;
@@ -850,6 +908,7 @@ class Enemy {
   hit() {
     if (this.dead) return;
     let damage = 1 + skillLevel("blade") * 0.35;
+    damage += equipmentMod("damage");
     if (hasRelic("thornbreaker") && ["imp", "guard", "regent"].includes(this.type)) damage += 0.75;
     if (hasRelic("crownSpark") && run?.sparkReady) {
       damage += 2.5;
@@ -868,6 +927,10 @@ class Enemy {
         if (!run?.active) activeLevel.exit.open = true;
       }
       if (run?.active) run.kills++;
+      const killShard = equipmentMod("killShard");
+      if (killShard) {
+        for (let i = 0; i < killShard; i++) activeLevel.pickups.push(makePickup(this.x + 8 + i * 13, this.y - 4, true));
+      }
       if (hasRelic("duelistRibbon") && run?.kills > 0 && run.kills % 5 === 0 && player.hp < player.maxHp) {
         player.hp++;
         showToast("Duelist Ribbon restores a heart.");
@@ -882,8 +945,12 @@ function makePickup(x, y, bonus = false) {
   return { x, y, w: 22, h: 22, taken: false, bonus, spin: Math.random() * Math.PI * 2 };
 }
 
+function defaultEquipment() {
+  return { weapon: "oathblade", armor: "travelcloak", charm: "plainbell" };
+}
+
 function defaultSave() {
-  return { sigils: 0, skills: {}, bestRoom: 0, runs: 0, wins: 0 };
+  return { sigils: 0, skills: {}, equipment: defaultEquipment(), bestRoom: 0, runs: 0, wins: 0, introSeen: false, trainingGrant: false };
 }
 
 function loadSave() {
@@ -894,6 +961,12 @@ function loadSave() {
   }
   for (const skill of SKILLS) {
     save.skills[skill.id] = clamp(save.skills[skill.id] || 0, 0, skill.max);
+  }
+  save.equipment = { ...defaultEquipment(), ...(save.equipment || {}) };
+  if (!save.trainingGrant) {
+    save.sigils += 6;
+    save.trainingGrant = true;
+    saveGame();
   }
 }
 
@@ -909,11 +982,20 @@ function hasRelic(id) {
   return !!run?.relics?.some((r) => r.id === id);
 }
 
+function equipped(slot) {
+  const id = save?.equipment?.[slot] || defaultEquipment()[slot];
+  return EQUIPMENT[slot].find((item) => item.id === id) || EQUIPMENT[slot][0];
+}
+
+function equipmentMod(name) {
+  return EQUIPMENT_SLOTS.reduce((sum, slot) => sum + (equipped(slot.id).mods[name] || 0), 0);
+}
+
 function startRun() {
   unlockAudio();
+  startMusic("run");
   menuPanel.classList.add("hidden");
   setOverlayMode(null);
-  const firstRelic = pickRelics(3);
   run = {
     active: true,
     room: 0,
@@ -930,7 +1012,8 @@ function startRun() {
     revived: false,
     startedAt: performance.now(),
   };
-  totalShards = skillLevel("pockets") * 4;
+  const firstRelic = pickRelics(3);
+  totalShards = skillLevel("pockets") * 4 + equipmentMod("startShards");
   totalRelics = 0;
   chooseRelic(firstRelic, "Starting Relic", "Choose Oscar's first advantage for this Lantern Run.", () => {
     loadRogueRoom(0);
@@ -953,7 +1036,7 @@ function loadRogueRoom(roomNumber) {
 
 function applyRunStats() {
   if (!player) return;
-  player.maxHp = 5 + (skillLevel("guard") >= 1 ? 1 : 0) + (skillLevel("guard") >= 3 ? 1 : 0);
+  player.maxHp = 5 + (skillLevel("guard") >= 1 ? 1 : 0) + (skillLevel("guard") >= 3 ? 1 : 0) + equipmentMod("hearts");
   if (hasRelic("lionHeart")) player.maxHp += 1;
   player.hp = Math.min(player.hp || player.maxHp, player.maxHp);
 }
@@ -1100,6 +1183,7 @@ function nextRogueRoom() {
 }
 
 function finishRun(won) {
+  stopMusic();
   const roomBonus = Math.max(1, run.room + (won ? 4 : 0));
   const earned = run.sigilsEarned + roomBonus + Math.floor(totalShards / 12);
   save.sigils += earned;
@@ -1120,8 +1204,8 @@ function pickRelics(count) {
   const owned = new Set(run?.relics?.map((r) => r.id) || []);
   const pool = RELICS.filter((r) => !owned.has(r.id));
   const luck = skillLevel("luck");
-  const sorted = shuffle(pool).slice(0, Math.min(pool.length, count + (luck > 0 ? 1 : 0)));
-  return sorted.slice(0, count);
+  const optionCount = count + (luck > 0 ? 1 : 0) + equipmentMod("relicChoice");
+  return shuffle(pool).slice(0, Math.min(pool.length, optionCount));
 }
 
 function chooseRelic(options, title, text, done) {
@@ -1161,18 +1245,36 @@ function openSkillTree() {
   setOverlayMode("cinema");
   choiceKicker.textContent = "Hall of Dawn";
   choiceTitle.textContent = `Sun Sigils: ${save.sigils}`;
-  choiceText.textContent = "Buy permanent upgrades, then begin another Lantern Run.";
+  choiceText.textContent = "Spend Sigils on permanent upgrades, set Oscar's equipment, then begin a Lantern Run. Your choices save immediately.";
   choiceActions.innerHTML = "";
   const runButton = document.createElement("button");
   runButton.type = "button";
   runButton.className = "primary-choice";
-  runButton.innerHTML = "<strong>Begin Lantern Run</strong><span>Enter a 30-room rogue-lite chain with relics, shops, altars, fountains, and bosses.</span>";
+  runButton.innerHTML = `<strong>Begin Lantern Run</strong><span>Current kit: ${equipmentSummary()}. Enter a 30-room rogue-lite chain with relics, shops, altars, fountains, and bosses.</span>`;
   runButton.addEventListener("click", () => {
     choicePanel.classList.add("hidden");
     pendingChoice = null;
     startRun();
   });
   choiceActions.appendChild(runButton);
+
+  const equipmentSection = document.createElement("div");
+  equipmentSection.className = "choice-section";
+  equipmentSection.innerHTML = "<div><strong>Equipment</strong><p>Pick one item per slot. These are active for the next run.</p></div>";
+  const equipmentGrid = document.createElement("div");
+  equipmentGrid.className = "equipment-grid";
+  for (const slot of EQUIPMENT_SLOTS) {
+    const current = equipped(slot.id);
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "equipped";
+    button.innerHTML = `<strong>${slot.name}: ${current.name}</strong><span>${current.desc} Click to change.</span>`;
+    button.addEventListener("click", () => openEquipmentPicker(slot.id));
+    equipmentGrid.appendChild(button);
+  }
+  equipmentSection.appendChild(equipmentGrid);
+  choiceActions.appendChild(equipmentSection);
+
   for (const skill of SKILLS) {
     const level = skillLevel(skill.id);
     const cost = skill.cost + level * 2;
@@ -1185,11 +1287,44 @@ function openSkillTree() {
       save.sigils -= cost;
       save.skills[skill.id] = level + 1;
       saveGame();
+      showToast(`${skill.name} upgraded to ${level + 1}.`);
       openSkillTree();
     });
     choiceActions.appendChild(button);
   }
   choicePanel.classList.remove("hidden");
+}
+
+function equipmentSummary() {
+  return EQUIPMENT_SLOTS.map((slot) => equipped(slot.id).name).join(" / ");
+}
+
+function openEquipmentPicker(slotId) {
+  const slot = EQUIPMENT_SLOTS.find((s) => s.id === slotId);
+  if (!slot) return;
+  choiceKicker.textContent = "Equipment";
+  choiceTitle.textContent = slot.name;
+  choiceText.textContent = "Equipment is free to swap and changes Oscar's stats for the next run.";
+  choiceActions.innerHTML = "";
+  for (const item of EQUIPMENT[slotId]) {
+    const button = document.createElement("button");
+    button.type = "button";
+    if (save.equipment[slotId] === item.id) button.className = "equipped";
+    button.innerHTML = `<strong>${item.name}${save.equipment[slotId] === item.id ? " · Equipped" : ""}</strong><span>${item.desc}</span>`;
+    button.addEventListener("click", () => {
+      save.equipment[slotId] = item.id;
+      saveGame();
+      showToast(`${item.name} equipped.`);
+      openSkillTree();
+    });
+    choiceActions.appendChild(button);
+  }
+  const back = document.createElement("button");
+  back.type = "button";
+  back.className = "primary-choice";
+  back.innerHTML = "<strong>Back To Hall</strong><span>Return to upgrades and start the next run.</span>";
+  back.addEventListener("click", openSkillTree);
+  choiceActions.appendChild(back);
 }
 
 function shuffle(items) {
@@ -1221,6 +1356,42 @@ function loadLevel(index) {
 function startQuest() {
   unlockAudio();
   menuPanel.classList.add("hidden");
+  if (!save.introSeen) {
+    openIntro();
+  } else {
+    startMusic("intro");
+    openSkillTree();
+  }
+}
+
+function openIntro() {
+  state = "intro";
+  introIndex = 0;
+  setOverlayMode("intro");
+  introPanel.classList.remove("hidden");
+  startMusic("intro");
+  renderIntroScene();
+}
+
+function renderIntroScene() {
+  const scene = INTRO_SCENES[introIndex] || INTRO_SCENES[INTRO_SCENES.length - 1];
+  introKicker.textContent = scene.kicker;
+  introTitle.textContent = scene.title;
+  introText.textContent = scene.text;
+  introNextButton.textContent = introIndex >= INTRO_SCENES.length - 1 ? "Enter Hall" : "Next Scene";
+}
+
+function advanceIntro(skip = false) {
+  if (!skip && introIndex < INTRO_SCENES.length - 1) {
+    introIndex++;
+    renderIntroScene();
+    playTone("relic");
+    return;
+  }
+  save.introSeen = true;
+  saveGame();
+  introPanel.classList.add("hidden");
+  setOverlayMode("cinema");
   openSkillTree();
 }
 
@@ -1445,7 +1616,7 @@ function handleInteractables() {
 }
 
 function openShop() {
-  const discount = skillLevel("pockets") * 2;
+  const discount = skillLevel("pockets") * 2 + equipmentMod("discount");
   const options = [
     { name: "Heal", desc: "Restore 2 hearts.", cost: 8, action: () => { player.hp = Math.min(player.maxHp, player.hp + 2); } },
     { name: "Sun Sigil", desc: "Bank 3 permanent Sigils.", cost: 12, action: () => { run.sigilsEarned += 3; } },
@@ -2816,9 +2987,62 @@ function updateHud() {
 }
 
 function unlockAudio() {
-  if (unlockedAudio) return;
-  audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  if (!unlockedAudio) {
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    musicGain = audioCtx.createGain();
+    musicGain.gain.value = 0.045;
+    musicGain.connect(audioCtx.destination);
+    unlockedAudio = true;
+  }
+  if (audioCtx?.state === "suspended") audioCtx.resume();
   unlockedAudio = true;
+}
+
+function startMusic(mode = "run") {
+  if (muted || !audioCtx || musicMode === mode) return;
+  stopMusic(false);
+  musicMode = mode;
+  musicStep = 0;
+  scheduleMusicStep();
+  musicTimer = window.setInterval(scheduleMusicStep, mode === "intro" ? 640 : 420);
+}
+
+function stopMusic(clearMode = true) {
+  if (musicTimer) {
+    window.clearInterval(musicTimer);
+    musicTimer = null;
+  }
+  if (clearMode) musicMode = null;
+}
+
+function scheduleMusicStep() {
+  if (muted || !audioCtx || !musicGain) return;
+  const introNotes = [196, 246.94, 293.66, 369.99, 329.63, 246.94, 220, 293.66];
+  const runNotes = [146.83, 220, 293.66, 246.94, 164.81, 246.94, 329.63, 293.66];
+  const notes = musicMode === "intro" ? introNotes : runNotes;
+  const bass = musicMode === "intro" ? [98, 123.47, 146.83, 123.47] : [73.42, 98, 110, 98];
+  const now = audioCtx.currentTime;
+  playMusicNote(notes[musicStep % notes.length], 0.28, now, "triangle", 0.032);
+  if (musicStep % 2 === 0) playMusicNote(bass[Math.floor(musicStep / 2) % bass.length], 0.42, now, "sine", 0.026);
+  musicStep++;
+}
+
+function playMusicNote(freq, dur, when, type, volume) {
+  const osc = audioCtx.createOscillator();
+  const gain = audioCtx.createGain();
+  const filter = audioCtx.createBiquadFilter();
+  osc.type = type;
+  osc.frequency.setValueAtTime(freq, when);
+  filter.type = "lowpass";
+  filter.frequency.setValueAtTime(1200, when);
+  gain.gain.setValueAtTime(0.0001, when);
+  gain.gain.exponentialRampToValueAtTime(volume, when + 0.03);
+  gain.gain.exponentialRampToValueAtTime(0.0001, when + dur);
+  osc.connect(filter);
+  filter.connect(gain);
+  gain.connect(musicGain);
+  osc.start(when);
+  osc.stop(when + dur + 0.03);
 }
 
 function playTone(kind) {
@@ -2933,6 +3157,19 @@ muteButton.addEventListener("click", () => {
   muted = !muted;
   muteButton.textContent = muted ? "Sound Off" : "Sound On";
   muteButton.setAttribute("aria-pressed", String(muted));
+  if (muted) stopMusic();
+  else if (state === "intro") startMusic("intro");
+  else if (state === "playing") startMusic("run");
+});
+
+introNextButton.addEventListener("click", () => {
+  unlockAudio();
+  advanceIntro(false);
+});
+
+introSkipButton.addEventListener("click", () => {
+  unlockAudio();
+  advanceIntro(true);
 });
 
 function loop(now) {

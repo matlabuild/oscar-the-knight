@@ -29,9 +29,34 @@
           <p class="kicker">A hand-forged browser quest</p>
           <h1>Oscar The Knight</h1>
           <p class="subtitle">Recover the Crown Lantern before the valley forgets sunrise.</p>
+          <div class="quick-guide" aria-label="Controls and goal">
+            <span>Move: A/D or Arrows</span>
+            <span>Jump: Space/W/Up</span>
+            <span>Strike: J/K/X</span>
+            <span>Dash: Shift/L</span>
+          </div>
           <div class="menu-actions">
             <button id="startButton" type="button">Begin Quest</button>
             <button id="muteButton" type="button" aria-pressed="false">Sound On</button>
+          </div>
+        </div>
+
+        <div class="intro-panel hidden" id="introPanel" aria-live="polite">
+          <div class="intro-sky">
+            <span class="intro-moon"></span>
+            <span class="intro-tower tower-a"></span>
+            <span class="intro-tower tower-b"></span>
+            <span class="intro-oscar"></span>
+            <span class="intro-lantern"></span>
+          </div>
+          <div class="intro-copy">
+            <p class="cinema-kicker" id="introKicker">Prologue</p>
+            <h2 id="introTitle">The Crown Lantern Falls Silent</h2>
+            <p id="introText">Rowanvale wakes under a moon that forgot to leave. Oscar hears the old bell fail, buckles on a borrowed shield, and follows the last warm spark toward the Thorn Regent.</p>
+            <div class="intro-actions">
+              <button id="introNextButton" type="button">Next Scene</button>
+              <button id="introSkipButton" type="button">Skip</button>
+            </div>
           </div>
         </div>
 

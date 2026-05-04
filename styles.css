@@ -248,7 +248,7 @@ h1 {
 .cinema-card,
 .choice-card {
   width: min(760px, 100%);
-  max-height: calc(100% - 12px);
+  max-height: calc(100% - 6px);
   overflow: auto;
   padding: clamp(20px, 4vw, 34px);
   border: 1px solid rgba(255, 244, 214, 0.18);
@@ -275,18 +275,24 @@ h1 {
 
 .choice-actions {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 10px;
 }
 
 .choice-actions button {
-  min-height: 64px;
+  min-height: 58px;
   padding: 10px 12px;
   border-radius: 8px;
   color: #fff4d6;
   background: rgba(255, 244, 214, 0.1);
   box-shadow: 0 0 0 1px rgba(255, 244, 214, 0.18) inset, 0 14px 30px rgba(0, 0, 0, 0.24);
   text-align: left;
+}
+
+.choice-actions .primary-choice {
+  grid-column: 1 / -1;
+  min-height: 62px;
+  background: linear-gradient(135deg, rgba(240, 196, 91, 0.3), rgba(166, 230, 214, 0.16));
 }
 
 .choice-actions button:disabled {

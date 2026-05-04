@@ -265,7 +265,9 @@ const SKILLS = [
   { id: "guard", name: "Lion Guard", branch: "Shield", cost: 3, max: 3, desc: "+1 max heart on ranks 1 and 3." },
   { id: "dash", name: "Dawn Dash", branch: "Mobility", cost: 4, max: 1, desc: "Unlock a quick mid-air dash with Shift/L." },
   { id: "magnet", name: "Moon Pull", branch: "Lantern", cost: 2, max: 3, desc: "Moon shards drift toward Oscar." },
+  { id: "pockets", name: "Royal Pockets", branch: "Economy", cost: 3, max: 3, desc: "Start with shards and haggle better shop prices." },
   { id: "luck", name: "Relic Luck", branch: "Lantern", cost: 4, max: 2, desc: "More treasure rooms and better relic rolls." },
+  { id: "vitality", name: "Stone Vow", branch: "Shield", cost: 5, max: 2, desc: "Rooms sometimes restore a heart after hard clears." },
   { id: "revive", name: "Last Bell", branch: "Lantern", cost: 8, max: 1, desc: "Once per run, revive with 2 hearts." },
 ];
 
@@ -278,12 +280,18 @@ const RELICS = [
   { id: "quarryHook", name: "Quarry Hook", desc: "Jump higher after landing on small platforms.", color: "#d6b26d" },
   { id: "starGlass", name: "Star Glass", desc: "Projectiles move slower near Oscar.", color: "#b6d7ff" },
   { id: "roseCloak", name: "Rose Cloak", desc: "First hit in each room is ignored.", color: "#d4586a" },
+  { id: "swiftGreaves", name: "Swift Greaves", desc: "Move faster and keep a little more speed in the air.", color: "#9fe2ad" },
+  { id: "silverLedger", name: "Silver Ledger", desc: "Combat rooms bank one extra Sun Sigil.", color: "#e2e0d2" },
+  { id: "duelistRibbon", name: "Duelist Ribbon", desc: "Every fifth defeated foe restores a heart.", color: "#d4586a" },
+  { id: "glassBell", name: "Glass Bell", desc: "Taking damage drops a burst of moon shards.", color: "#a6e6d6" },
 ];
 
 const ROOM_KINDS = [
-  "combat", "combat", "treasure", "combat", "shop", "miniboss",
-  "fountain", "combat", "challenge", "combat", "treasure", "miniboss",
-  "shop", "challenge", "fountain", "combat", "treasure", "boss",
+  "combat", "parkour", "treasure", "combat", "shop", "elite",
+  "fountain", "combat", "challenge", "gauntlet", "treasure", "miniboss",
+  "shop", "parkour", "fountain", "combat", "altar", "challenge",
+  "elite", "treasure", "gauntlet", "shop", "fountain", "miniboss",
+  "parkour", "challenge", "altar", "treasure", "elite", "boss",
 ];
 
 const PALETTES = {
@@ -576,10 +584,10 @@ class Player {
 
   update(dt) {
     const accel = this.grounded ? 0.84 : 0.5;
-    const max = input.down ? 2.6 : 4.2 + skillLevel("blade") * 0.12;
+    const max = input.down ? 2.6 : 4.2 + skillLevel("blade") * 0.12 + (hasRelic("swiftGreaves") ? 0.45 : 0);
     if (input.left) this.vx -= accel;
     if (input.right) this.vx += accel;
-    if (!input.left && !input.right) this.vx *= this.grounded ? 0.78 : 0.95;
+    if (!input.left && !input.right) this.vx *= this.grounded ? 0.78 : hasRelic("swiftGreaves") ? 0.98 : 0.95;
     this.vx = clamp(this.vx, -max, max);
     if (Math.abs(this.vx) > 0.18) this.dir = Math.sign(this.vx);
 
@@ -703,6 +711,9 @@ class Player {
       amount = Math.max(1, amount - 1);
     }
     this.hp -= amount;
+    if (hasRelic("glassBell")) {
+      for (let i = 0; i < 4; i++) activeLevel.pickups.push(makePickup(this.x + 4 + i * 12, this.y + 8, true));
+    }
     this.invincible = 74;
     this.vx = knock * 6.4;
     this.vy = -8.2;
@@ -840,9 +851,14 @@ class Enemy {
       this.dead = true;
       if (this.type === "regent") {
         showToast("The Thorn Regent drops the Lantern's shadow cage.");
-        activeLevel.exit.open = true;
+        if (!run?.active) activeLevel.exit.open = true;
       }
       if (run?.active) run.kills++;
+      if (hasRelic("duelistRibbon") && run?.kills > 0 && run.kills % 5 === 0 && player.hp < player.maxHp) {
+        player.hp++;
+        showToast("Duelist Ribbon restores a heart.");
+        updateHud();
+      }
       for (let i = 0; i < 3; i++) activeLevel.pickups.push(makePickup(this.x + i * 15, this.y + 5, true));
     }
   }
@@ -900,7 +916,7 @@ function startRun() {
     revived: false,
     startedAt: performance.now(),
   };
-  totalShards = 0;
+  totalShards = skillLevel("pockets") * 4;
   totalRelics = 0;
   chooseRelic(firstRelic, "Starting Relic", "Choose Oscar's first advantage for this Lantern Run.", () => {
     loadRogueRoom(0);
@@ -930,9 +946,10 @@ function applyRunStats() {
 
 function generateRogueLevel(roomNumber) {
   const kind = ROOM_KINDS[roomNumber] || "combat";
-  const biomeIndex = Math.min(3, Math.floor(roomNumber / 5));
+  const biomeIndex = Math.min(3, Math.floor(roomNumber / 8));
   const source = LEVELS[biomeIndex];
-  const width = kind === "boss" || kind === "miniboss" ? 1900 : kind === "shop" || kind === "fountain" || kind === "treasure" ? 1450 : 1850 + (roomNumber % 2) * 220;
+  const safeRoom = ["shop", "fountain", "treasure", "altar"].includes(kind);
+  const width = kind === "boss" || kind === "miniboss" || kind === "elite" ? 2050 : safeRoom ? 1450 : 1850 + (roomNumber % 2) * 220;
   const theme = source.palette;
   const groundY = theme === "observatory" ? 432 : theme === "ember" ? 440 : 438;
   const platforms = [
@@ -949,11 +966,22 @@ function generateRogueLevel(roomNumber) {
   ].filter((p) => p.x + p.w < width - 110);
   platforms.push(...floaters);
 
+  if (kind === "parkour" || kind === "challenge") {
+    platforms.push(
+      { x: 420, y: 242, w: 92, h: 22, trim: theme === "briar" ? "wood" : "stone" },
+      { x: 790, y: 226, w: 92, h: 22, trim: "stone" },
+      { x: 1160, y: 246, w: 96, h: 22, trim: theme === "gate" ? "wood" : "stone" },
+      { x: 1530, y: 236, w: 92, h: 22, trim: "stone" },
+    );
+  }
+
   const hazards = [];
-  if (!["shop", "fountain", "treasure"].includes(kind)) {
+  if (!safeRoom) {
     const hazardType = theme === "ember" ? "lava" : theme === "observatory" ? "void" : roomNumber % 2 ? "pit" : "bramble";
     hazards.push({ x: 430, y: groundY + 38, w: 72, h: 54, type: hazardType });
     hazards.push({ x: 1180, y: groundY + 38, w: 82, h: 54, type: hazardType });
+    if (["parkour", "challenge", "gauntlet", "boss"].includes(kind)) hazards.push({ x: 780, y: groundY + 38, w: 78, h: 54, type: hazardType });
+    if (["gauntlet", "boss"].includes(kind)) hazards.push({ x: 1510, y: groundY + 38, w: 84, h: 54, type: hazardType });
   }
 
   const pickups = [];
@@ -963,10 +991,18 @@ function generateRogueLevel(roomNumber) {
   }
 
   const enemies = [];
-  if (kind === "combat" || kind === "challenge") {
+  if (kind === "combat" || kind === "challenge" || kind === "gauntlet") {
     enemies.push({ type: roomNumber > 4 ? "guard" : "imp", x: 620, y: groundY - 42, min: 520, max: 760 });
     enemies.push({ type: roomNumber > 2 ? "bat" : "imp", x: 1020, y: 250, min: 890, max: 1160 });
     if (roomNumber > 5) enemies.push({ type: theme === "ember" ? "ember" : "guard", x: 1430, y: groundY - 44, min: 1320, max: width - 190 });
+    if (kind === "gauntlet") {
+      enemies.push({ type: "bat", x: 710, y: 220, min: 540, max: 850 });
+      enemies.push({ type: roomNumber > 16 ? "regent" : "guard", x: width - 420, y: groundY - 52, min: width - 560, max: width - 210 });
+    }
+  }
+  if (kind === "elite") {
+    enemies.push({ type: "regent", x: width - 400, y: groundY - 72, min: width - 560, max: width - 190 });
+    enemies.push({ type: theme === "ember" ? "ember" : "guard", x: 900, y: groundY - 48, min: 720, max: 1120 });
   }
   if (kind === "miniboss") {
     enemies.push({ type: roomNumber > 8 ? "regent" : "guard", x: width - 360, y: groundY - 68, min: width - 520, max: width - 180 });
@@ -984,6 +1020,7 @@ function generateRogueLevel(roomNumber) {
     pickups.push({ x: 630, y: groundY - 90 }, { x: 940, y: groundY - 90 });
   }
   if (kind === "fountain") interactables.push({ type: "fountain", x: 800, y: groundY - 76, w: 70, h: 70, used: false });
+  if (kind === "altar") interactables.push({ type: "altar", x: 800, y: groundY - 82, w: 72, h: 76, used: false });
 
   return {
     name: `${source.name} ${roomNumber + 1}/${run?.maxRooms || 12}`,
@@ -994,7 +1031,7 @@ function generateRogueLevel(roomNumber) {
     biomeIndex,
     width,
     spawn: { x: 80, y: groundY - 74 },
-    exit: { x: width - 112, y: groundY - 132, w: 78, h: 132, open: ["shop", "fountain", "treasure"].includes(kind) },
+    exit: { x: width - 112, y: groundY - 132, w: 78, h: 132, open: safeRoom || kind === "parkour" },
     platforms,
     hazards,
     pickups: pickups.map((p) => makePickup(p.x, p.y)),
@@ -1008,17 +1045,22 @@ function generateRogueLevel(roomNumber) {
     projectiles: [],
     checkpoints: [],
     interactables,
+    roomRewarded: false,
   };
 }
 
 function roomSubtitle(kind, roomNumber) {
   const map = {
     combat: "Clear the room to open the gate.",
+    parkour: "A dangerous crossing. Reach the far gate cleanly.",
     challenge: "A harder room. Better rewards.",
+    gauntlet: "A long room packed with enemies and hazards.",
+    elite: "An elite champion carries extra Sigils.",
     miniboss: "A knight of thorns guards the road.",
     treasure: "A moon chest waits quietly.",
     shop: "Spend moon shards before the road turns mean.",
     fountain: "The old fountain remembers your wounds.",
+    altar: "Trade blood or shards for a dangerous blessing.",
     boss: "Survive the Thorn Regent's ambush.",
   };
   return map[kind] || `Room ${roomNumber + 1}`;
@@ -1109,7 +1151,8 @@ function openSkillTree() {
   choiceActions.innerHTML = "";
   const runButton = document.createElement("button");
   runButton.type = "button";
-  runButton.innerHTML = "<strong>Begin Lantern Run</strong><span>Enter an 18-room rogue-lite chain with relics, shops, fountains, and bosses.</span>";
+  runButton.className = "primary-choice";
+  runButton.innerHTML = "<strong>Begin Lantern Run</strong><span>Enter a 30-room rogue-lite chain with relics, shops, altars, fountains, and bosses.</span>";
   runButton.addEventListener("click", () => {
     choicePanel.classList.add("hidden");
     pendingChoice = null;
@@ -1247,8 +1290,10 @@ function update(dt) {
 function updateProjectiles() {
   for (let i = activeLevel.projectiles.length - 1; i >= 0; i--) {
     const p = activeLevel.projectiles[i];
-    p.x += p.vx;
-    p.y += p.vy;
+    const nearSlow = hasRelic("starGlass") && Math.hypot(player.x + player.w / 2 - p.x, player.y + player.h / 2 - p.y) < 210;
+    const speedScale = nearSlow ? 0.62 : 1;
+    p.x += p.vx * speedScale;
+    p.y += p.vy * speedScale;
     p.vy += 0.05;
     p.life--;
     if (Math.random() < 0.45) burst(p.x, p.y, 1, "#a6e6d6", 1.4);
@@ -1326,11 +1371,32 @@ function updateRoomState() {
   if (!run?.active || !activeLevel) return;
   if (!activeLevel.exit.open && activeLevel.enemies.length === 0) {
     activeLevel.exit.open = true;
-    const reward = activeLevel.roomKind === "challenge" ? 3 : activeLevel.roomKind === "miniboss" ? 5 : activeLevel.roomKind === "boss" ? 10 : 1;
-    run.sigilsEarned += reward;
+    awardRoomClear(activeLevel.roomKind);
+    const reward = roomReward(activeLevel.roomKind);
     showToast(`Gate opened. +${reward} Sun Sigil${reward > 1 ? "s" : ""}.`);
     burst(activeLevel.exit.x + 35, activeLevel.exit.y + 46, 30, activeLevel.palette.accent, 3);
   }
+}
+
+function roomReward(kind) {
+  const base = kind === "challenge" ? 3 : kind === "gauntlet" ? 4 : kind === "elite" ? 5 : kind === "miniboss" ? 6 : kind === "boss" ? 12 : kind === "parkour" ? 2 : 1;
+  return base + (hasRelic("silverLedger") && ["combat", "challenge", "gauntlet", "elite", "miniboss", "boss"].includes(kind) ? 1 : 0);
+}
+
+function awardRoomClear(kind) {
+  if (activeLevel.roomRewarded) return 0;
+  const reward = roomReward(kind);
+  run.sigilsEarned += reward;
+  activeLevel.roomRewarded = true;
+  if (skillLevel("vitality") > 0 && ["challenge", "gauntlet", "elite", "miniboss", "boss"].includes(kind) && player.hp < player.maxHp) {
+    const chance = 0.35 + skillLevel("vitality") * 0.22;
+    if (Math.random() < chance) {
+      player.hp++;
+      updateHud();
+      showToast("Stone Vow restores a heart.");
+    }
+  }
+  return reward;
 }
 
 function handleInteractables() {
@@ -1357,16 +1423,23 @@ function handleInteractables() {
       playTone("relic");
       showToast(`Fountain restored ${healed} heart${healed > 1 ? "s" : ""}.`);
       updateHud();
+    } else if (item.type === "altar") {
+      item.used = true;
+      openAltar();
     }
   }
 }
 
 function openShop() {
+  const discount = skillLevel("pockets") * 2;
   const options = [
-    { name: "Heal", desc: "Restore 2 hearts. Cost: 8 Moon Shards.", cost: 8, action: () => { player.hp = Math.min(player.maxHp, player.hp + 2); } },
-    { name: "Sun Sigil", desc: "Bank 3 permanent Sigils. Cost: 12 Moon Shards.", cost: 12, action: () => { run.sigilsEarned += 3; } },
-    { name: "Relic Roll", desc: "Choose a new relic. Cost: 15 Moon Shards.", cost: 15, action: () => chooseRelic(pickRelics(3), "Shop Relic", "A purchased relic joins this run.", () => { state = "playing"; }) },
-  ];
+    { name: "Heal", desc: "Restore 2 hearts.", cost: 8, action: () => { player.hp = Math.min(player.maxHp, player.hp + 2); } },
+    { name: "Sun Sigil", desc: "Bank 3 permanent Sigils.", cost: 12, action: () => { run.sigilsEarned += 3; } },
+    { name: "Relic Roll", desc: "Choose a new relic.", cost: 15, action: () => {
+      chooseRelic(pickRelics(3), "Shop Relic", "A purchased relic joins this run.", () => { state = "playing"; });
+      return "choice";
+    } },
+  ].map((opt) => ({ ...opt, cost: Math.max(4, opt.cost - discount) }));
   state = "choice";
   setOverlayMode("cinema");
   pendingChoice = { type: "shop" };
@@ -1378,11 +1451,16 @@ function openShop() {
     const button = document.createElement("button");
     button.type = "button";
     button.disabled = totalShards < opt.cost;
-    button.innerHTML = `<strong>${opt.name}</strong><span>${opt.desc}</span>`;
+    button.innerHTML = `<strong>${opt.name}</strong><span>${opt.desc} Cost: ${opt.cost} Moon Shards.</span>`;
     button.addEventListener("click", () => {
       if (totalShards < opt.cost) return;
       totalShards -= opt.cost;
-      opt.action();
+      const result = opt.action();
+      if (result === "choice") {
+        updateHud();
+        showToast(`${opt.name} bought.`);
+        return;
+      }
       choicePanel.classList.add("hidden");
       pendingChoice = null;
       setOverlayMode(null);
@@ -1405,6 +1483,68 @@ function openShop() {
   choicePanel.classList.remove("hidden");
 }
 
+function openAltar() {
+  state = "choice";
+  setOverlayMode("cinema");
+  pendingChoice = { type: "altar" };
+  choiceKicker.textContent = "Thorn Altar";
+  choiceTitle.textContent = "Choose A Bargain";
+  choiceText.textContent = "The altar pays well, but it always takes something first.";
+  choiceActions.innerHTML = "";
+  const options = [
+    {
+      name: "Blood Oath",
+      desc: "Lose 1 heart now. Choose a relic.",
+      enabled: () => player.hp > 1,
+      action: () => {
+        player.hp--;
+        chooseRelic(pickRelics(3), "Blood Oath", "The altar answers with a relic.", () => { state = "playing"; });
+        return "choice";
+      },
+    },
+    {
+      name: "Shard Offering",
+      desc: "Spend 10 Moon Shards. Bank 5 Sun Sigils.",
+      enabled: () => totalShards >= 10,
+      action: () => {
+        totalShards -= 10;
+        run.sigilsEarned += 5;
+        showToast("The altar banks 5 Sun Sigils.");
+      },
+    },
+    {
+      name: "Quiet Prayer",
+      desc: "Restore 1 heart and leave.",
+      enabled: () => true,
+      action: () => {
+        player.hp = Math.min(player.maxHp, player.hp + 1);
+        showToast("The altar grants a small mercy.");
+      },
+    },
+  ];
+  for (const opt of options) {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.disabled = !opt.enabled();
+    button.innerHTML = `<strong>${opt.name}</strong><span>${opt.desc}</span>`;
+    button.addEventListener("click", () => {
+      if (!opt.enabled()) return;
+      const result = opt.action();
+      if (result === "choice") {
+        updateHud();
+        return;
+      }
+      choicePanel.classList.add("hidden");
+      pendingChoice = null;
+      setOverlayMode(null);
+      state = "playing";
+      updateHud();
+    });
+    choiceActions.appendChild(button);
+  }
+  choicePanel.classList.remove("hidden");
+}
+
 function handleExit() {
   const gate = activeLevel.exit;
   if (run?.active) {
@@ -1412,7 +1552,13 @@ function handleExit() {
       if (rects(player.rect, gate)) showToast("Clear the room first.");
       return;
     }
-    if (rects(player.rect, gate)) nextRogueRoom();
+    if (rects(player.rect, gate)) {
+      if (activeLevel.roomKind === "parkour" && !activeLevel.roomRewarded) {
+        const reward = awardRoomClear("parkour");
+        showToast(`Crossing complete. +${reward} Sun Sigils.`);
+      }
+      nextRogueRoom();
+    }
     return;
   }
   if (levelIndex === LEVELS.length - 1 && !gate.open) return;
@@ -1989,6 +2135,9 @@ function drawInteractables() {
         ctx.beginPath();
         ctx.arc(item.x + 34, item.y + 24, 18, 0, Math.PI * 2);
         ctx.fill();
+      } else if (item.type === "altar") {
+        drawEnvSprite(ENV.doorBriar, item.x - 12, item.y - 34, 92, 116, false, { glow: "#d4586a", blur: 14 });
+        drawEnvSprite(ENV.lanternGold, item.x + 14, item.y - 42, 42, 68, false, { glow: "#f0c45b", blur: 12 });
       }
     } else {
       ctx.fillStyle = item.type === "fountain" ? "#a6e6d6" : item.type === "shop" ? "#f0c45b" : "#9b6a3c";
@@ -1996,7 +2145,7 @@ function drawInteractables() {
       ctx.fill();
     }
     if (!item.used && rects(player?.rect || { x: -999, y: -999, w: 0, h: 0 }, item)) {
-      drawWorldLabel(item.x + item.w / 2, item.y - 18, item.type === "shop" ? "Shop" : item.type === "fountain" ? "Heal" : "Open");
+      drawWorldLabel(item.x + item.w / 2, item.y - 18, item.type === "shop" ? "Shop" : item.type === "fountain" ? "Heal" : item.type === "altar" ? "Pray" : "Open");
     }
     ctx.restore();
   }

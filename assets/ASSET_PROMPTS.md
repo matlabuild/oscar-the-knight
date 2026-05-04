@@ -27,3 +27,14 @@ Environment atlas prompt summary:
 ```text
 Create a premium hand-painted environment sprite sheet for Oscar The Knight with modular mossy stone platforms, carved observatory platforms, ember keep lava-stone platforms, wooden quarry platforms, ornate arched doors/gates, checkpoint banner pole, thorn brambles, spikes, lava vents, crates, hanging lanterns, brass chains, vines, flowers, and foreground rocks. Organized on a flat #00ff00 chroma-key background for alpha removal.
 ```
+
+Item and upgrade atlas files:
+
+- `assets/source/oscar-items-atlas-chroma.png`
+- `assets/generated/oscar-items-atlas.png`
+
+Item atlas prompt summary:
+
+```text
+Create a 4 columns by 6 rows hand-painted fantasy UI sprite atlas for Oscar The Knight. Include equipment, upgrade, and relic icons: Oathblade, Sunlance, Briar Needle, Travel Cloak, Lion Plate, Moonweave, Plain Bell, Merchant Seal, Crestfinder, Longer Blade, Lion Guard, Dawn Dash, Moon Pull, Royal Pockets, Relic Luck, Stone Vow, Last Bell, Thornbreaker, Ember Boots, Moon Magnet, Crown Spark, Lion Heart, Star Glass, and Rose Cloak. No labels, no text, no watermark. Organized on a flat #00ff00 chroma-key background for alpha removal.
+```

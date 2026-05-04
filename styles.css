@@ -453,6 +453,29 @@ h1 {
   text-align: left;
 }
 
+.choice-actions button.has-icon {
+  display: grid;
+  grid-template-columns: 46px minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+  min-height: 76px;
+}
+
+.choice-icon {
+  width: 44px;
+  height: 44px;
+  display: block;
+  border-radius: 8px;
+  background-image: url("./assets/generated/oscar-items-atlas.png");
+  background-size: 400% 600%;
+  background-position: var(--icon-x) var(--icon-y);
+  filter: drop-shadow(0 7px 8px rgba(0, 0, 0, 0.38));
+}
+
+.choice-copy {
+  min-width: 0;
+}
+
 .choice-actions .primary-choice {
   grid-column: 1 / -1;
   min-height: 62px;
@@ -462,7 +485,7 @@ h1 {
 .choice-section {
   grid-column: 1 / -1;
   display: grid;
-  grid-template-columns: minmax(0, 0.9fr) minmax(0, 2fr);
+  grid-template-columns: minmax(0, 0.62fr) minmax(0, 2.38fr);
   gap: 12px;
   margin: 2px 0 4px;
   padding: 12px;
@@ -483,7 +506,7 @@ h1 {
 
 .equipment-grid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 8px;
 }
 
@@ -491,6 +514,32 @@ h1 {
 .equipment-grid button.equipped {
   background: linear-gradient(135deg, rgba(240, 196, 91, 0.32), rgba(98, 184, 123, 0.16));
   box-shadow: 0 0 0 1px rgba(255, 231, 168, 0.42) inset, 0 16px 34px rgba(0, 0, 0, 0.25);
+}
+
+.equipment-grid button.has-icon {
+  grid-template-columns: 1fr;
+  justify-items: center;
+  align-content: start;
+  min-height: 136px;
+  padding: 10px;
+  text-align: center;
+}
+
+.equipment-grid .choice-icon {
+  width: 40px;
+  height: 40px;
+  margin-bottom: 4px;
+}
+
+.equipment-grid .choice-actions strong,
+.equipment-grid strong {
+  margin-bottom: 5px;
+}
+
+.equipment-grid .choice-actions span,
+.equipment-grid span {
+  font-size: 0.72rem;
+  line-height: 1.18;
 }
 
 .choice-actions button:disabled {
@@ -747,6 +796,16 @@ h1 {
   .choice-actions button {
     min-height: 58px;
     font-size: 0.72rem;
+  }
+
+  .choice-actions button.has-icon {
+    grid-template-columns: 38px minmax(0, 1fr);
+    min-height: 64px;
+  }
+
+  .choice-icon {
+    width: 36px;
+    height: 36px;
   }
 
   .cinema-kicker {

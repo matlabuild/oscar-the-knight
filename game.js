@@ -92,6 +92,13 @@ envAtlas.addEventListener("load", () => {
   envReady = true;
 });
 
+const itemAtlas = new Image();
+itemAtlas.src = "./assets/generated/oscar-items-atlas.png";
+let itemReady = false;
+itemAtlas.addEventListener("load", () => {
+  itemReady = true;
+});
+
 const BACKDROP_SOURCES = {
   gate: "./assets/generated/bg-moonlit-gate.png",
   briar: "./assets/generated/bg-briar-quarry.png",
@@ -333,13 +340,41 @@ const EQUIPMENT = {
     { id: "merchantseal", name: "Merchant Seal", desc: "Begin with +6 shards and better shop prices.", mods: { startShards: 6, discount: 2 } },
     { id: "crestfinder", name: "Crestfinder", desc: "Relic choices show one extra option.", mods: { relicChoice: 1 } },
   ],
+  boots: [
+    { id: "marchboots", name: "March Boots", desc: "Reliable boots with no tradeoff.", mods: {} },
+    { id: "swiftboots", name: "Swift Boots", desc: "Move faster and keep more speed in the air.", mods: { speed: 0.34 } },
+    { id: "emberstriders", name: "Ember Striders", desc: "Slight speed boost and better hazard protection.", mods: { speed: 0.12, hazardGrace: 1 } },
+  ],
 };
 
 const EQUIPMENT_SLOTS = [
   { id: "weapon", name: "Weapon" },
   { id: "armor", name: "Armor" },
   { id: "charm", name: "Charm" },
+  { id: "boots", name: "Boots" },
 ];
+
+const ITEM_ICON_ORDER = [
+  "oathblade", "sunlance", "needle", "travelcloak",
+  "lionplate", "moonweave", "plainbell", "merchantseal",
+  "crestfinder", "blade", "guard", "dash",
+  "magnet", "pockets", "luck", "vitality",
+  "revive", "thornbreaker", "emberBoots", "moonMagnet",
+  "crownSpark", "lionHeart", "starGlass", "roseCloak",
+];
+
+const ITEM_ICON_ALIASES = {
+  quarryHook: "crestfinder",
+  swiftGreaves: "dash",
+  silverLedger: "merchantseal",
+  duelistRibbon: "needle",
+  glassBell: "revive",
+  marchboots: "dash",
+  swiftboots: "dash",
+  emberstriders: "emberBoots",
+};
+
+const ITEM_ICON_INDEX = Object.fromEntries(ITEM_ICON_ORDER.map((id, index) => [id, index]));
 
 const ROOM_KINDS = [
   "combat", "parkour", "treasure", "combat", "shop", "elite",
@@ -946,7 +981,7 @@ function makePickup(x, y, bonus = false) {
 }
 
 function defaultEquipment() {
-  return { weapon: "oathblade", armor: "travelcloak", charm: "plainbell" };
+  return { weapon: "oathblade", armor: "travelcloak", charm: "plainbell", boots: "marchboots" };
 }
 
 function defaultSave() {
@@ -989,6 +1024,36 @@ function equipped(slot) {
 
 function equipmentMod(name) {
   return EQUIPMENT_SLOTS.reduce((sum, slot) => sum + (equipped(slot.id).mods[name] || 0), 0);
+}
+
+function iconId(id) {
+  return ITEM_ICON_ALIASES[id] || id;
+}
+
+function iconFrame(id) {
+  const index = ITEM_ICON_INDEX[iconId(id)] ?? 0;
+  const cellW = itemAtlas.width ? itemAtlas.width / 4 : 313.5;
+  const cellH = itemAtlas.height ? itemAtlas.height / 6 : 209;
+  return {
+    x: (index % 4) * cellW,
+    y: Math.floor(index / 4) * cellH,
+    w: cellW,
+    h: cellH,
+    col: index % 4,
+    row: Math.floor(index / 4),
+  };
+}
+
+function iconMarkup(id) {
+  const frame = iconFrame(id);
+  const x = frame.col === 0 ? 0 : (frame.col / 3) * 100;
+  const y = frame.row === 0 ? 0 : (frame.row / 5) * 100;
+  return `<span class="choice-icon" style="--icon-x:${x}%;--icon-y:${y}%"></span>`;
+}
+
+function setIconButton(button, id, title, text) {
+  button.classList.add("has-icon");
+  button.innerHTML = `${iconMarkup(id)}<span class="choice-copy"><strong>${title}</strong><span>${text}</span></span>`;
 }
 
 function startRun() {
@@ -1219,7 +1284,7 @@ function chooseRelic(options, title, text, done) {
   for (const relic of options) {
     const button = document.createElement("button");
     button.type = "button";
-    button.innerHTML = `<strong>${relic.name}</strong><span>${relic.desc}</span>`;
+    setIconButton(button, relic.id, relic.name, relic.desc);
     button.addEventListener("click", () => {
       run.relics.push(relic);
       totalRelics = run.relics.length;
@@ -1268,7 +1333,7 @@ function openSkillTree() {
     const button = document.createElement("button");
     button.type = "button";
     button.className = "equipped";
-    button.innerHTML = `<strong>${slot.name}: ${current.name}</strong><span>${current.desc} Click to change.</span>`;
+    setIconButton(button, current.id, `${slot.name}: ${current.name}`, `${current.desc} Click to change.`);
     button.addEventListener("click", () => openEquipmentPicker(slot.id));
     equipmentGrid.appendChild(button);
   }
@@ -1281,7 +1346,7 @@ function openSkillTree() {
     const button = document.createElement("button");
     button.type = "button";
     button.disabled = level >= skill.max || save.sigils < cost;
-    button.innerHTML = `<strong>${skill.branch}: ${skill.name} ${level}/${skill.max}</strong><span>${level >= skill.max ? "Mastered" : `${cost} Sigils. ${skill.desc}`}</span>`;
+    setIconButton(button, skill.id, `${skill.branch}: ${skill.name} ${level}/${skill.max}`, level >= skill.max ? "Mastered" : `${cost} Sigils. ${skill.desc}`);
     button.addEventListener("click", () => {
       if (save.sigils < cost || level >= skill.max) return;
       save.sigils -= cost;
@@ -1310,7 +1375,7 @@ function openEquipmentPicker(slotId) {
     const button = document.createElement("button");
     button.type = "button";
     if (save.equipment[slotId] === item.id) button.className = "equipped";
-    button.innerHTML = `<strong>${item.name}${save.equipment[slotId] === item.id ? " · Equipped" : ""}</strong><span>${item.desc}</span>`;
+    setIconButton(button, item.id, `${item.name}${save.equipment[slotId] === item.id ? " · Equipped" : ""}`, item.desc);
     button.addEventListener("click", () => {
       save.equipment[slotId] = item.id;
       saveGame();
@@ -1618,9 +1683,9 @@ function handleInteractables() {
 function openShop() {
   const discount = skillLevel("pockets") * 2 + equipmentMod("discount");
   const options = [
-    { name: "Heal", desc: "Restore 2 hearts.", cost: 8, action: () => { player.hp = Math.min(player.maxHp, player.hp + 2); } },
-    { name: "Sun Sigil", desc: "Bank 3 permanent Sigils.", cost: 12, action: () => { run.sigilsEarned += 3; } },
-    { name: "Relic Roll", desc: "Choose a new relic.", cost: 15, action: () => {
+    { name: "Heal", icon: "lionHeart", desc: "Restore 2 hearts.", cost: 8, action: () => { player.hp = Math.min(player.maxHp, player.hp + 2); } },
+    { name: "Sun Sigil", icon: "crownSpark", desc: "Bank 3 permanent Sigils.", cost: 12, action: () => { run.sigilsEarned += 3; } },
+    { name: "Relic Roll", icon: "crestfinder", desc: "Choose a new relic.", cost: 15, action: () => {
       chooseRelic(pickRelics(3), "Shop Relic", "A purchased relic joins this run.", () => { state = "playing"; });
       return "choice";
     } },
@@ -1636,7 +1701,7 @@ function openShop() {
     const button = document.createElement("button");
     button.type = "button";
     button.disabled = totalShards < opt.cost;
-    button.innerHTML = `<strong>${opt.name}</strong><span>${opt.desc} Cost: ${opt.cost} Moon Shards.</span>`;
+    setIconButton(button, opt.icon || "merchantseal", opt.name, `${opt.desc} Cost: ${opt.cost} Moon Shards.`);
     button.addEventListener("click", () => {
       if (totalShards < opt.cost) return;
       totalShards -= opt.cost;
@@ -1679,6 +1744,7 @@ function openAltar() {
   const options = [
     {
       name: "Blood Oath",
+      icon: "roseCloak",
       desc: "Lose 1 heart now. Choose a relic.",
       enabled: () => player.hp > 1,
       action: () => {
@@ -1689,6 +1755,7 @@ function openAltar() {
     },
     {
       name: "Shard Offering",
+      icon: "pockets",
       desc: "Spend 10 Moon Shards. Bank 5 Sun Sigils.",
       enabled: () => totalShards >= 10,
       action: () => {
@@ -1699,6 +1766,7 @@ function openAltar() {
     },
     {
       name: "Quiet Prayer",
+      icon: "lionHeart",
       desc: "Restore 1 heart and leave.",
       enabled: () => true,
       action: () => {
@@ -1711,7 +1779,7 @@ function openAltar() {
     const button = document.createElement("button");
     button.type = "button";
     button.disabled = !opt.enabled();
-    button.innerHTML = `<strong>${opt.name}</strong><span>${opt.desc}</span>`;
+    setIconButton(button, opt.icon || "vitality", opt.name, opt.desc);
     button.addEventListener("click", () => {
       if (!opt.enabled()) return;
       const result = opt.action();
@@ -2721,6 +2789,40 @@ function drawPaintedPlayer(pl) {
   if (pl.invincible > 0 && Math.floor(pl.invincible / 5) % 2 === 0) ctx.globalAlpha = 0.58;
   drawOvalShadow(pl.x + pl.w / 2, pl.y + pl.h - 5, 30, 7);
   drawAtlasSprite(frame, pl.x + offX, pl.y + offY, drawW, drawH, pl.dir < 0);
+  drawPlayerEquipment(pl);
+  ctx.restore();
+}
+
+function drawPlayerEquipment(pl) {
+  if (!itemReady || !save?.equipment) return;
+  const dir = pl.dir < 0 ? -1 : 1;
+  const cx = pl.x + pl.w / 2;
+  const cy = pl.y + pl.h / 2;
+  const weapon = equipped("weapon").id;
+  const armor = equipped("armor").id;
+  const charm = equipped("charm").id;
+  const boots = equipped("boots").id;
+
+  ctx.save();
+  ctx.globalAlpha = pl.invincible > 0 && Math.floor(pl.invincible / 5) % 2 === 0 ? 0.58 : 1;
+  if (weapon !== "oathblade" || skillLevel("blade") > 0 || hasRelic("crownSpark")) {
+    const size = weapon === "sunlance" ? 34 : 28;
+    drawItemIcon(weapon === "needle" ? "needle" : weapon === "sunlance" ? "sunlance" : "blade", cx + dir * 26, cy - 14, size, size, dir < 0, weapon === "sunlance" || hasRelic("crownSpark") ? "#ffe07a" : null);
+  }
+  if (armor !== "travelcloak" || skillLevel("guard") > 0 || hasRelic("lionHeart")) {
+    drawItemIcon(armor === "lionplate" || skillLevel("guard") > 0 ? "lionplate" : "moonweave", cx - 1, cy - 1, 34, 34, false, armor === "moonweave" ? "#a6e6d6" : "#ffe07a");
+  }
+  if (charm !== "plainbell" || skillLevel("magnet") > 0 || hasRelic("moonMagnet")) {
+    const charmIcon = charm === "merchantseal" ? "merchantseal" : charm === "crestfinder" ? "crestfinder" : skillLevel("magnet") > 0 || hasRelic("moonMagnet") ? "moonMagnet" : "plainbell";
+    drawItemIcon(charmIcon, cx - dir * 25, cy - 38 + Math.sin(time * 0.01) * 3, 23, 23, false, "#a6e6d6");
+  }
+  if (boots !== "marchboots" || skillLevel("dash") > 0 || hasRelic("swiftGreaves") || hasRelic("emberBoots")) {
+    const bootIcon = boots === "emberstriders" || hasRelic("emberBoots") ? "emberBoots" : "dash";
+    drawItemIcon(bootIcon, cx + dir * 6, pl.y + pl.h - 12, 28, 28, dir < 0, bootIcon === "emberBoots" ? "#ffb15a" : "#a6e6d6");
+  }
+  if (hasRelic("roseCloak")) {
+    drawItemIcon("roseCloak", cx - dir * 17, cy + 4, 30, 30, dir < 0, "#d4586a");
+  }
   ctx.restore();
 }
 
@@ -2781,6 +2883,24 @@ function drawAtlasSprite(frame, x, y, w, h, flip = false, options = {}) {
     ctx.drawImage(atlas, frame.x, frame.y, frame.w, frame.h, 0, 0, w, h);
   } else {
     ctx.drawImage(atlas, frame.x, frame.y, frame.w, frame.h, x, y, w, h);
+  }
+  ctx.restore();
+}
+
+function drawItemIcon(id, cx, cy, w, h, flip = false, glow = null) {
+  if (!itemReady) return;
+  const frame = iconFrame(id);
+  ctx.save();
+  if (glow) {
+    ctx.shadowColor = glow;
+    ctx.shadowBlur = 12;
+  }
+  if (flip) {
+    ctx.translate(cx + w / 2, cy - h / 2);
+    ctx.scale(-1, 1);
+    ctx.drawImage(itemAtlas, frame.x, frame.y, frame.w, frame.h, 0, 0, w, h);
+  } else {
+    ctx.drawImage(itemAtlas, frame.x, frame.y, frame.w, frame.h, cx - w / 2, cy - h / 2, w, h);
   }
   ctx.restore();
 }
@@ -2990,7 +3110,7 @@ function unlockAudio() {
   if (!unlockedAudio) {
     audioCtx = new (window.AudioContext || window.webkitAudioContext)();
     musicGain = audioCtx.createGain();
-    musicGain.gain.value = 0.045;
+    musicGain.gain.value = 0.82;
     musicGain.connect(audioCtx.destination);
     unlockedAudio = true;
   }

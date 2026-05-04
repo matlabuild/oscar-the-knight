@@ -776,6 +776,7 @@ class Enemy {
     this.t = Math.random() * 100;
     this.baseY = def.y;
     this.cooldown = 0;
+    this.spawn = { x: def.x, y: def.y };
   }
 
   get rect() {
@@ -806,6 +807,10 @@ class Enemy {
           }
         }
       }
+      if (this.y > H + 170) {
+        this.fallOut();
+        return;
+      }
     }
 
     if (this.type === "regent" && this.cooldown <= 0 && Math.abs(player.x - this.x) < 420) {
@@ -831,6 +836,15 @@ class Enemy {
         player.damage(1, player.x < this.x ? -1 : 1);
       }
     }
+  }
+
+  fallOut() {
+    if (this.dead) return;
+    this.dead = true;
+    if (run?.active) run.kills++;
+    if (this.type === "regent" && !run?.active) activeLevel.exit.open = true;
+    burst(clamp(this.x + this.w / 2, camera.x + 40, camera.x + W - 40), H + camera.y - 28, 18, "#a6e6d6", 2.2);
+    showToast("A foe falls into the dark. The room still counts.");
   }
 
   hit() {
@@ -2119,6 +2133,7 @@ function drawInteractables() {
   if (!activeLevel?.interactables) return;
   for (const item of activeLevel.interactables) {
     ctx.save();
+    drawInteractionBeacon(item);
     if (envReady) {
       if (item.type === "chest") {
         drawEnvSprite(item.used ? ENV.crateA : ENV.crateB, item.x - 8, item.y - 6, 66, 54, false, {
@@ -2127,7 +2142,6 @@ function drawInteractables() {
         });
       } else if (item.type === "shop") {
         drawEnvSprite(ENV.lanternGold, item.x - 6, item.y - 42, 56, 88, false, { glow: "#f0c45b", blur: 16 });
-        drawEnvSprite(ENV.barrel, item.x + 36, item.y + 12, 38, 40);
       } else if (item.type === "fountain") {
         drawEnvSprite(ENV.lanternBlue, item.x + 4, item.y - 32, 58, 94, false, { glow: "#a6e6d6", blur: 18 });
         ctx.globalAlpha = 0.6 + Math.sin(time * 0.012) * 0.16;
@@ -2144,24 +2158,50 @@ function drawInteractables() {
       roundRect(item.x, item.y, item.w, item.h, 8);
       ctx.fill();
     }
-    if (!item.used && rects(player?.rect || { x: -999, y: -999, w: 0, h: 0 }, item)) {
-      drawWorldLabel(item.x + item.w / 2, item.y - 18, item.type === "shop" ? "Shop" : item.type === "fountain" ? "Heal" : item.type === "altar" ? "Pray" : "Open");
-    }
+    if (!item.used) drawWorldLabel(item.x + item.w / 2, item.y - 18, interactableLabel(item), rects(player?.rect || { x: -999, y: -999, w: 0, h: 0 }, item));
     ctx.restore();
   }
 }
 
-function drawWorldLabel(x, y, text) {
+function interactableLabel(item) {
+  return item.type === "shop" ? "Shop" : item.type === "fountain" ? "Fountain" : item.type === "altar" ? "Altar" : "Chest";
+}
+
+function drawInteractionBeacon(item) {
+  if (item.used) return;
+  const cx = item.x + item.w / 2;
+  const cy = item.y + item.h - 4;
+  const pulse = 0.5 + Math.sin(time * 0.01 + item.x) * 0.5;
+  const color = item.type === "fountain" ? "#a6e6d6" : item.type === "altar" ? "#d4586a" : "#ffe07a";
+  ctx.save();
+  ctx.globalAlpha = 0.34 + pulse * 0.16;
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.ellipse(cx, cy, item.w * 0.72 + pulse * 5, 9 + pulse * 2, 0, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.globalAlpha = 0.12;
+  ctx.fillStyle = color;
+  ctx.beginPath();
+  ctx.ellipse(cx, cy, item.w * 0.8, 10, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+}
+
+function drawWorldLabel(x, y, text, active = false) {
   ctx.save();
   ctx.font = "800 12px Trebuchet MS";
-  const width = ctx.measureText(text).width + 18;
-  ctx.fillStyle = "rgba(31, 22, 31, 0.84)";
+  const label = active ? `${text}` : text;
+  const width = ctx.measureText(label).width + 18;
+  ctx.fillStyle = active ? "rgba(49, 35, 28, 0.94)" : "rgba(31, 22, 31, 0.7)";
   roundRect(x - width / 2, y - 18, width, 24, 7);
   ctx.fill();
-  ctx.fillStyle = "#ffe7a8";
+  ctx.strokeStyle = active ? "rgba(255, 231, 168, 0.46)" : "rgba(255, 244, 214, 0.16)";
+  ctx.stroke();
+  ctx.fillStyle = active ? "#fff4d6" : "rgba(255, 231, 168, 0.78)";
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
-  ctx.fillText(text, x, y - 6);
+  ctx.fillText(label, x, y - 6);
   ctx.restore();
 }
 
@@ -2175,7 +2215,9 @@ function drawBackDressing() {
     }
   } else if (theme === "observatory") {
     for (let x = 300; x < activeLevel.width; x += 740) {
-      drawEnvSprite(ENV.lanternBlue, x, 292, 42, 66, false, { glow: "#a6e6d6", blur: 18 });
+      ctx.globalAlpha = 0.42;
+      drawEnvSprite(ENV.lanternBlue, x, 220, 34, 52, false, { glow: "#a6e6d6", blur: 8 });
+      ctx.globalAlpha = 1;
     }
   } else if (theme === "briar") {
     for (let x = 250; x < activeLevel.width; x += 520) {
@@ -2183,7 +2225,9 @@ function drawBackDressing() {
     }
   } else {
     for (let x = 380; x < activeLevel.width; x += 760) {
-      drawEnvSprite(ENV.lanternGold, x, 294, 40, 64, false, { glow: "#f0c45b", blur: 16 });
+      ctx.globalAlpha = 0.42;
+      drawEnvSprite(ENV.lanternGold, x, 224, 34, 52, false, { glow: "#f0c45b", blur: 8 });
+      ctx.globalAlpha = 1;
     }
   }
   ctx.restore();
@@ -2199,11 +2243,15 @@ function drawPlatformDressing() {
     if (theme === "ember") {
       if (seed % 2 === 0) drawEnvSprite(ENV.chainU, p.x + p.w - 154, p.y - 88, 112, 62);
     } else if (theme === "observatory") {
-      if (seed % 2 === 0) drawEnvSprite(ENV.rockD, p.x + p.w - 120, p.y - 66, 88, 56);
+      if (seed % 2 === 0) drawEnvSprite(ENV.chainLong, p.x + p.w - 72, p.y - 166, 28, 96);
     } else if (theme === "briar") {
-      drawEnvSprite(seed % 2 ? ENV.rockB : ENV.rockA, p.x + p.w - 118, p.y - 58, 90, 52);
+      if (seed % 2 === 0) drawEnvSprite(ENV.vineA, p.x + p.w - 96, p.y - 122, 40, 82);
     } else {
-      if (seed % 2 === 0) drawEnvSprite(ENV.crateA, p.x + p.w - 92, p.y - 62, 54, 48);
+      if (seed % 2 === 0) {
+        ctx.globalAlpha = 0.62;
+        drawEnvSprite(ENV.bannerTorn, p.x + p.w - 74, p.y - 112, 38, 76);
+        ctx.globalAlpha = 1;
+      }
     }
   }
   ctx.restore();

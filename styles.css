@@ -1,0 +1,488 @@
+:root {
+  color-scheme: dark;
+  --ink: #1b1421;
+  --velvet: #2c1834;
+  --night: #131925;
+  --gold: #f0c45b;
+  --leaf: #62b87b;
+  --rose: #d4586a;
+  --milk: #fff4d6;
+  --blue: #69a8d8;
+  --shadow: rgba(15, 10, 20, 0.46);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  width: 100%;
+  min-height: 100%;
+  margin: 0;
+}
+
+body {
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 22% 18%, rgba(240, 196, 91, 0.26), transparent 21rem),
+    radial-gradient(circle at 84% 10%, rgba(105, 168, 216, 0.22), transparent 24rem),
+    linear-gradient(145deg, #211426 0%, #142331 44%, #28371f 100%);
+  color: var(--milk);
+  font-family: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
+}
+
+button {
+  border: 0;
+  color: var(--ink);
+  font: 700 0.95rem/1 "Trebuchet MS", "Gill Sans", sans-serif;
+  cursor: pointer;
+}
+
+button:focus-visible {
+  outline: 3px solid rgba(240, 196, 91, 0.8);
+  outline-offset: 4px;
+}
+
+.shell {
+  position: relative;
+  width: min(100vw, 1260px);
+  height: min(100vh, 860px);
+  display: grid;
+  place-items: center;
+  padding: clamp(12px, 3vw, 34px);
+}
+
+.marquee {
+  position: absolute;
+  inset: auto 0 14px;
+  display: flex;
+  gap: 26px;
+  justify-content: center;
+  color: rgba(255, 244, 214, 0.26);
+  font: 700 0.72rem/1 "Trebuchet MS", sans-serif;
+  letter-spacing: 0;
+  text-transform: uppercase;
+  pointer-events: none;
+}
+
+.stage-wrap {
+  position: relative;
+  width: min(100%, calc((100vh - 72px) * 16 / 9));
+  aspect-ratio: 16 / 9;
+  min-width: min(100%, 320px);
+  overflow: hidden;
+  border: 1px solid rgba(255, 244, 214, 0.18);
+  border-radius: 8px;
+  background: #111922;
+  box-shadow:
+    0 26px 80px rgba(0, 0, 0, 0.42),
+    0 1px 0 rgba(255, 244, 214, 0.18) inset;
+}
+
+canvas {
+  width: 100%;
+  height: 100%;
+  display: block;
+  image-rendering: auto;
+}
+
+.hud {
+  position: absolute;
+  top: 14px;
+  left: 14px;
+  right: 14px;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  pointer-events: none;
+  opacity: 1;
+  transition: opacity 160ms ease;
+}
+
+.menu-open .hud,
+.cinema-open .hud,
+.menu-open .toast,
+.cinema-open .toast,
+.menu-open .toast.show,
+.cinema-open .toast.show {
+  opacity: 0;
+}
+
+.menu-open .touch-controls,
+.cinema-open .touch-controls {
+  display: none;
+}
+
+.hud-cluster,
+.hud-pill {
+  min-height: 34px;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 10px;
+  border: 1px solid rgba(255, 244, 214, 0.18);
+  border-radius: 8px;
+  background: rgba(27, 20, 33, 0.52);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.16);
+  backdrop-filter: blur(8px);
+  color: var(--milk);
+  font: 800 0.74rem/1 "Trebuchet MS", sans-serif;
+  text-transform: uppercase;
+}
+
+.hud-pill:first-of-type {
+  max-width: min(46vw, 360px);
+}
+
+.heart {
+  width: 16px;
+  height: 16px;
+  transform: rotate(45deg);
+  border-radius: 3px;
+  background: linear-gradient(135deg, #ff8a7c, #bd334e);
+  box-shadow: 0 0 12px rgba(212, 88, 106, 0.55);
+}
+
+.heart.empty {
+  background: rgba(255, 244, 214, 0.22);
+  box-shadow: none;
+}
+
+.sigil {
+  width: 15px;
+  height: 15px;
+  display: inline-block;
+}
+
+.sigil.shard {
+  clip-path: polygon(50% 0, 72% 36%, 100% 50%, 72% 64%, 50% 100%, 28% 64%, 0 50%, 28% 36%);
+  background: linear-gradient(#fff5a8, #f0a82c);
+}
+
+.sigil.relic {
+  border-radius: 50% 50% 5px 5px;
+  background: linear-gradient(135deg, #9fe2ad, #397c5d);
+}
+
+.menu-panel {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  align-content: center;
+  justify-items: center;
+  padding: clamp(24px, 6vw, 68px);
+  text-align: center;
+  background:
+    linear-gradient(to bottom, rgba(19, 25, 37, 0.18), rgba(19, 25, 37, 0.72)),
+    radial-gradient(circle at center 42%, rgba(240, 196, 91, 0.14), transparent 18rem);
+}
+
+.menu-panel.hidden,
+.cinema.hidden,
+.choice-panel.hidden {
+  display: none;
+}
+
+.kicker,
+.cinema-kicker {
+  margin: 0 0 10px;
+  color: rgba(255, 244, 214, 0.76);
+  font: 800 0.76rem/1 "Trebuchet MS", sans-serif;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+h1 {
+  max-width: 780px;
+  margin: 0;
+  color: #ffeebf;
+  font-size: 6.4rem;
+  line-height: 0.86;
+  text-shadow: 0 5px 0 rgba(83, 47, 38, 0.55), 0 26px 50px rgba(0, 0, 0, 0.42);
+}
+
+.subtitle {
+  max-width: 560px;
+  margin: 22px 0 0;
+  color: rgba(255, 244, 214, 0.86);
+  font-size: 1.2rem;
+}
+
+.menu-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 10px;
+  margin-top: 28px;
+}
+
+.menu-actions button,
+.cinema button {
+  min-width: 138px;
+  min-height: 44px;
+  padding: 0 18px;
+  border-radius: 8px;
+  background: linear-gradient(180deg, #ffe7a8, #dda33f);
+  box-shadow: 0 5px 0 #8c552b, 0 16px 30px rgba(0, 0, 0, 0.32);
+}
+
+.menu-actions button + button {
+  color: var(--milk);
+  background: rgba(255, 244, 214, 0.13);
+  box-shadow: 0 0 0 1px rgba(255, 244, 214, 0.22) inset;
+}
+
+.cinema,
+.choice-panel {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: end center;
+  padding: clamp(18px, 4vw, 44px);
+  background: linear-gradient(to bottom, rgba(9, 13, 24, 0.18), rgba(9, 13, 24, 0.7));
+}
+
+.cinema-card,
+.choice-card {
+  width: min(760px, 100%);
+  max-height: calc(100% - 12px);
+  overflow: auto;
+  padding: clamp(20px, 4vw, 34px);
+  border: 1px solid rgba(255, 244, 214, 0.18);
+  border-radius: 8px;
+  background: rgba(31, 22, 31, 0.86);
+  box-shadow: 0 28px 70px rgba(0, 0, 0, 0.42);
+}
+
+.cinema h2,
+.choice-card h2 {
+  margin: 0;
+  color: #ffeebf;
+  font-size: 3rem;
+  line-height: 0.95;
+}
+
+.cinema p:last-of-type,
+.choice-card p:last-of-type {
+  margin: 14px 0 22px;
+  color: rgba(255, 244, 214, 0.88);
+  font-size: 1.12rem;
+  line-height: 1.45;
+}
+
+.choice-actions {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.choice-actions button {
+  min-height: 64px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  color: #fff4d6;
+  background: rgba(255, 244, 214, 0.1);
+  box-shadow: 0 0 0 1px rgba(255, 244, 214, 0.18) inset, 0 14px 30px rgba(0, 0, 0, 0.24);
+  text-align: left;
+}
+
+.choice-actions button:disabled {
+  cursor: not-allowed;
+  opacity: 0.46;
+}
+
+.choice-actions strong {
+  display: block;
+  margin-bottom: 7px;
+  color: #ffe7a8;
+}
+
+.choice-actions span {
+  display: block;
+  color: rgba(255, 244, 214, 0.78);
+  font-weight: 700;
+  line-height: 1.25;
+}
+
+.choice-card {
+  padding: clamp(16px, 3vw, 28px);
+}
+
+.toast {
+  position: absolute;
+  left: 50%;
+  bottom: 88px;
+  max-width: min(620px, calc(100% - 40px));
+  min-height: 40px;
+  padding: 12px 16px;
+  transform: translate(-50%, 16px);
+  border: 1px solid rgba(255, 244, 214, 0.18);
+  border-radius: 8px;
+  background: rgba(31, 22, 31, 0.84);
+  opacity: 0;
+  color: #ffeebf;
+  font: 800 0.82rem/1.2 "Trebuchet MS", sans-serif;
+  text-align: center;
+  transition: opacity 180ms ease, transform 180ms ease;
+  pointer-events: none;
+}
+
+.toast.show {
+  opacity: 1;
+  transform: translate(-50%, 0);
+}
+
+.touch-controls {
+  position: absolute;
+  inset: auto 14px 14px;
+  display: none;
+  justify-content: space-between;
+  pointer-events: none;
+}
+
+.touch-left,
+.touch-right {
+  display: flex;
+  gap: 8px;
+}
+
+.touch {
+  width: 52px;
+  height: 52px;
+  border: 1px solid rgba(255, 244, 214, 0.2);
+  border-radius: 50%;
+  background: rgba(255, 244, 214, 0.13);
+  color: #ffeebf;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.24);
+  backdrop-filter: blur(8px);
+  pointer-events: auto;
+}
+
+.touch.attack {
+  background: rgba(240, 196, 91, 0.22);
+}
+
+.touch.dash {
+  background: rgba(166, 230, 214, 0.17);
+}
+
+@media (hover: none), (pointer: coarse) {
+  .touch-controls {
+    display: flex;
+  }
+}
+
+@media (max-width: 660px) {
+  body {
+    overflow: hidden;
+  }
+
+  .shell {
+    height: 100svh;
+    padding: 6px;
+  }
+
+  .stage-wrap {
+    width: 100%;
+    max-height: calc(100svh - 12px);
+  }
+
+  .hud {
+    top: 8px;
+    left: 8px;
+    right: 8px;
+    gap: 5px;
+  }
+
+  .hud-cluster,
+  .hud-pill {
+    min-height: 29px;
+    padding: 6px 7px;
+    font-size: 0.61rem;
+  }
+
+  .heart {
+    width: 12px;
+    height: 12px;
+  }
+
+  .marquee {
+    display: none;
+  }
+
+  .menu-panel {
+    padding: 22px 12px 10px;
+  }
+
+  .kicker {
+    display: none;
+  }
+
+  h1 {
+    font-size: 2.05rem;
+    line-height: 0.84;
+  }
+
+  .subtitle {
+    display: none;
+  }
+
+  .menu-actions {
+    gap: 8px;
+    margin-top: 10px;
+  }
+
+  .menu-actions button,
+  .cinema button {
+    min-width: 116px;
+    min-height: 34px;
+    padding: 0 12px;
+    font-size: 0.78rem;
+  }
+
+  .cinema h2 {
+    font-size: 1.36rem;
+    line-height: 0.98;
+  }
+
+  .cinema p:last-of-type {
+    font-size: 0.82rem;
+    line-height: 1.28;
+    margin: 9px 0 12px;
+  }
+
+  .cinema-card {
+    padding: 14px 18px;
+  }
+
+  .choice-panel {
+    padding: 10px;
+  }
+
+  .choice-card {
+    padding: 12px;
+  }
+
+  .choice-actions {
+    grid-template-columns: 1fr;
+    gap: 7px;
+  }
+
+  .choice-actions button {
+    min-height: 58px;
+    font-size: 0.72rem;
+  }
+
+  .cinema-kicker {
+    margin-bottom: 7px;
+    font-size: 0.62rem;
+  }
+
+  .touch {
+    width: 46px;
+    height: 46px;
+  }
+}

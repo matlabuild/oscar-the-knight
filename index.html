@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Oscar The Knight</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main class="shell" aria-label="Oscar The Knight game">
+      <section class="marquee" aria-hidden="true">
+        <span>Oscar The Knight</span>
+        <span>The Crown Lantern</span>
+        <span>Oscar The Knight</span>
+        <span>The Crown Lantern</span>
+      </section>
+
+      <section class="stage-wrap">
+        <canvas id="game" width="960" height="540" aria-label="Oscar The Knight playable game canvas"></canvas>
+
+        <div class="hud" id="hud" aria-live="polite">
+          <div class="hud-cluster" id="hearts"></div>
+          <div class="hud-pill"><span id="levelName">Moonlit Gate</span></div>
+          <div class="hud-pill"><span class="sigil shard"></span><span id="shards">0</span></div>
+          <div class="hud-pill"><span class="sigil relic"></span><span id="relics">0</span></div>
+        </div>
+
+        <div class="menu-panel" id="menuPanel">
+          <p class="kicker">A hand-forged browser quest</p>
+          <h1>Oscar The Knight</h1>
+          <p class="subtitle">Recover the Crown Lantern before the valley forgets sunrise.</p>
+          <div class="menu-actions">
+            <button id="startButton" type="button">Begin Quest</button>
+            <button id="muteButton" type="button" aria-pressed="false">Sound On</button>
+          </div>
+        </div>
+
+        <div class="cinema hidden" id="cinema">
+          <div class="cinema-card">
+            <p class="cinema-kicker" id="cinemaKicker">Prologue</p>
+            <h2 id="cinemaTitle">The Bell That Would Not Ring</h2>
+            <p id="cinemaText"></p>
+            <button id="cinemaButton" type="button">Continue</button>
+          </div>
+        </div>
+
+        <div class="choice-panel hidden" id="choicePanel">
+          <div class="choice-card">
+            <p class="cinema-kicker" id="choiceKicker">Choose</p>
+            <h2 id="choiceTitle">Relic Found</h2>
+            <p id="choiceText"></p>
+            <div class="choice-actions" id="choiceActions"></div>
+          </div>
+        </div>
+
+        <div class="toast" id="toast"></div>
+
+        <div class="touch-controls" aria-hidden="true">
+          <div class="touch-left">
+            <button class="touch" data-touch="left" type="button">←</button>
+            <button class="touch" data-touch="right" type="button">→</button>
+          </div>
+          <div class="touch-right">
+            <button class="touch dash" data-touch="dash" type="button">↠</button>
+            <button class="touch jump" data-touch="jump" type="button">↑</button>
+            <button class="touch attack" data-touch="attack" type="button">✦</button>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <script src="./game.js"></script>
+  </body>
+</html>
